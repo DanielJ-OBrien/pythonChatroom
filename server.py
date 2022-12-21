@@ -7,7 +7,7 @@ from cryptography.fernet import Fernet
 import base64
 import random
 
-#Add simple class + proper disconnect handling on client side
+#Add proper disconnect handling on client side
 #Add simple login system (2+ distinct states for a pass)
 #Allow logins to be saved between server runs ()
 #implement proper class usage
