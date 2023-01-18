@@ -6,7 +6,7 @@ import base64
 import random
 
 class ClientMain:
-    
+    loggedInState = False
     fernet = None
     
 class DataProcessorClass(ClientMain):
@@ -31,6 +31,8 @@ class DataProcessorClass(ClientMain):
                         DataProcessorClass.CalculateSecret(message)
                     case 2:
                         DataProcessorClass.DisplayMessage(message)
+                    case 3:
+                        ClientMain.loggedInState = True
             except Exception as e:
                 pass
 
@@ -49,11 +51,12 @@ class DataProcessorClass(ClientMain):
             print(e)
         return key
 
+    def CalculateSecret(message, sent):
+        return (pow(sent,int(message),DataProcessorClass.publicPrime))
+
     def ConvertFern(sharedKey):
         return base64.urlsafe_b64encode(f"{sharedKey:032d}".encode("utf-8")[:32])   
 
-    def CalculateSecret(message, sent):
-        return (pow(sent,int(message),DataProcessorClass.publicPrime))
     
     def DisplayMessage(message):
         print(message)
@@ -62,33 +65,34 @@ class DataProcessorClass(ClientMain):
 class DataSenderClass(ClientMain):
     
     def DataSender():
+        #Sends messages when logged in
         while True:
             try:
                 time.sleep(1)
                 uip = input()
-                if uip[0] == "/":
-                    DataSenderClass.SendCommand(uip, ClientMain.fernet)
-                else:
-                    try:
+                try:
+                    if ClientMain.loggedInState == True:
                         DataSenderClass.SendBroadcast(uip, ClientMain.fernet)
-                    except Exception as e:
-                        print(e)
+                    else:
+                        #Sends password login attempts when not logged in
+                        print("Logging in...")
+                        DataSenderClass.SendPassword(uip, ClientMain.fernet)
+                except Exception as e:
+                    print(e)
             except:
                 pass
-            
+
     def EncryptMessage(message, fernet):
         encryptedMessage = fernet.encrypt(bytes(message, encoding='utf8'))
         return encryptedMessage
-
-
 
     def SendBroadcast(message, fernet):
         message = "1" + message
         message = DataSenderClass.EncryptMessage(message, fernet)
         s.send(message)
-
-    def SendCommand(message, fernet):
-        message = message[1:len(message)]
+        
+    def SendPassword(message, fernet):
+        message = "2" + message
         message = DataSenderClass.EncryptMessage(message, fernet)
         s.send(message)
 

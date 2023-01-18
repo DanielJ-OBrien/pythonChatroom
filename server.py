@@ -1,128 +1,155 @@
 import sys
 import socket
 import types
-import concurrent.futures
+from _thread import *
 import os
 from cryptography.fernet import Fernet
 import base64
 import random
+import time
 
 #Add proper disconnect handling on client side
-#Add simple login system (2+ distinct states for a pass)
-#Allow logins to be saved between server runs ()
-#implement proper class usage
+class serverMain():
 
-class serverMain:
+    def __init__(self):
+        
+        self._publicPrime = publicPrime = 134715397998534382362543644062597181361609479648842843616200298096041989690697848999412391468700769363391823159719834719898132229523645517185214071033109009859909166224500832798606843889422676631533434306132458441957921028226184976216824642407273933750712043589484173533001512977046594666429936219284470523999
+        self._publicBase =  publicBase = 2
+        self._privateNumber = privateNumber = 13
+        self._unverifiedUsers = unverifiedUsers = {}
+        self._verifiedUsers = verifiedUsers = {}
+        self._Users = Users = {}
+        self._Fernets = Fernets = {}
+        self._loggedInState = loggedInState = False
+        self._command = command = 0
+        self._s = s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
-    publicPrime = 134715397998534382362543644062597181361609479648842843616200298096041989690697848999412391468700769363391823159719834719898132229523645517185214071033109009859909166224500832798606843889422676631533434306132458441957921028226184976216824642407273933750712043589484173533001512977046594666429936219284470523999
-    publicBase = 2
-    privateNumber = 13
-    Users = {}
-    Fernets = {}
-    command = 0
-
-    def Broadcast(sentConn, command, message):
-        command = str(command) + str(serverMain.Users.get(sentConn))+ ": "
+    def Broadcast(self, sentConn, command, message):
+        command = str(command) + str(self._verifiedUsers.get(sentConn))+ ": "
         message = str(command) + str(message)
-        for conn in serverMain.Users:
+        for conn in self._verifiedUsers:
             if conn != sentConn:
                 holder = conn
-                for conn in serverMain.Fernets:
+                for conn in self._Fernets:
                     if conn == holder:
                         try:
-                            encryptedMessage = serverMain.EncryptMessage(message, serverMain.Fernets.get(conn))
+                            encryptedMessage = self.EncryptMessage(message, self._Fernets.get(conn))
                             conn.send(encryptedMessage)
                         except Exception as e:
                             print(e)
                             pass
         
-    def ChangeUsername(conn, message):
-        serverMain.Users.update({conn: message})
+    def ChangeUsername(self, conn, message):
+        self._verifiedUsers.update({conn: message})
 
 
-    def CalculateSecret(message, sent):
-        return (pow(int(message),sent,serverMain.publicPrime))
+    def CalculateSecret(self, message, sent):
+        return (pow(int(message),sent,self._publicPrime))
 
-    def ConvertFern(sharedKey):
+    def ConvertFern(self, sharedKey):
         return base64.urlsafe_b64encode(f"{sharedKey:032d}".encode("utf-8")[:32])
     
-    def DecryptMessage(message, fernet):
+    def DecryptMessage(self, message, fernet):
         decodedMessage = fernet.decrypt(message)
         return decodedMessage
 
-    def EncryptMessage(message, fernet):
+    def EncryptMessage(self, message, fernet):
         encryptedMessage = fernet.encrypt(bytes(message, encoding='utf8'))
         return encryptedMessage
 
-    def HandShake(conn, command, message):
-        message = pow(serverMain.publicBase,serverMain.privateNumber,serverMain.publicPrime)
+    def HandShake(self, conn, command, message):
+        message = pow(self._publicBase,self._privateNumber,self._publicPrime)
         sent = message
         message = str(command) + str(message)
         conn.send((message).encode("utf-8"))
         return sent
 
-    def SendData(conn, command, message, fernet):
+    def Login(self, conn, message, fernet):
+        if(message == "Password123"):
+            self.SendData(conn, 3, "", fernet)
+            time.sleep(1)
+            self.SendData(conn, 2, "Password Correct. You can now chat with other people.", fernet)
+            del self._unverifiedUsers[conn]
+            self._verifiedUsers[conn] = "Guest"
+        else:
+            self.SendData(conn, 2, "Password Incorrect.", fernet)
+
+    def SendData(self, conn, command, message, fernet):
+        print("1. ", message)
         message = str(command) + str(message)
-        message = serverMain.EncryptMessage(message, fernet)
-        conn.send((message).encode("utf-8"))
+        print("2. ", message)
+        message = self.EncryptMessage(message, fernet)
+        print("3. ", message)
+        conn.send(message)
 
-    def Main():
+    def Main(self, conn, addr):
         while True:
-            conn, addr = s.accept()
-            while True:
-                if(conn in serverMain.Users):
+            if(conn in self._Users):
+                try:
+                    #Connects to the client
+                    rData = conn.recv(1024).decode("utf-8")
                     try:
-                        #Connects to the client
-                        rData = conn.recv(1024).decode("utf-8")
-                        try:
-                            if fernet != None:
-                                rData = serverMain.DecryptMessage(rData, fernet)
-                                rData = rData.decode()  
-                        except Exception as e:
-                            pass
-                        command = int(rData[0])
-                        message = rData[1:]
-                        match command:
-                            case 0:
-                                sharedKey = serverMain.CalculateSecret(message, sent)
-                                fernet = Fernet(serverMain.ConvertFern(sharedKey))
-                                serverMain.Fernets[conn] = fernet
-                            case 1:
-                                serverMain.Broadcast(conn, 2, message)
-                            case 2:
-                                serverMain.SendData(conn, 2, message, fernet)
-                            case 3:
-                                serverMain.ChangeUsername(conn, message)
-                    
+                        if fernet != None:
+                            rData = self.DecryptMessage(rData, fernet)
+                            rData = rData.decode()  
                     except Exception as e:
-                        #Closes connection if it fails
-                        for x in serverMain.Users:
-                            if x == conn:
-                                del serverMain.Users[conn]
-                                conn.close()
-                                print("Connection closed due to: ")
-                                print(e)
+                        pass
+                    command = int(rData[0])
+                    message = rData[1:]
+                    match command:
+                        case 0:
+                            sharedKey = self.CalculateSecret(message, sent)
+                            fernet = Fernet(self.ConvertFern(sharedKey))
+                            self._Fernets[conn] = fernet
+                        case 1:
+                            self.Broadcast(conn, 2, message)
+                        case 2:
+                            if self._loggedInState == False:
+                                self.Login(conn, message, fernet)
+                            else:
+                                self.SendData(conn, 2, message, fernet)
+                        case 3:
+                            self.ChangeUsername(conn, message)
+                except Exception as e:
+                    print(e)
+                    for x in self._Users:
+                        if x == conn:
+                            try:
+                                del self._Users[conn]
+                            except:
                                 pass
-                else:
-                    print(f"New client registered: {addr}")
-                    serverMain.Users[conn] = "Guest"
-                    sent = serverMain.HandShake(conn, 0, "")
+                            try:
+                                del self._unverifiedUsers[conn]
+                            except:
+                                pass       
+                            try:
+                                del self._verifiedUsers[conn]
+                            except:
+                                pass
+                        pass
 
-threadCount = os.cpu_count()
-hostname = socket.gethostname()
-HOST = socket.gethostbyname(hostname)
-PORT = 50001
-s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-s.bind((HOST, PORT))
-s.listen()
-print(f"Listening on {(HOST, PORT)}")
-threadPool = concurrent.futures.ThreadPoolExecutor(threadCount)
-try:
-    for x in range(0,threadCount):
-        threadPool.submit(serverMain.Main)
-    while True:
-        pass
-except KeyboardInterrupt:
-    print("Caught keyboard interrupt, exiting")
+            else:
+                print(f"New client registered: {addr}")
+                self._Users[conn] = "Guest"
+                self._unverifiedUsers[conn] = "Guest"
+                sent = self.HandShake(conn, 0, "")
 
+    def RunServer(self):       
+        threadCount = os.cpu_count()
+        hostName = socket.gethostname()
+        HOST = socket.gethostbyname(hostName)
+        PORT = 50001
+        self._s.bind((HOST, PORT))
+        self._s.listen()
+        print(f"Listening on {(HOST, PORT)}")
+        while True:
+            try:
+                conn, addr = self._s.accept()
+                start_new_thread(self.Main, (conn, addr))
+                    
+            except KeyboardInterrupt:
+                print("Caught keyboard interrupt, exiting")
 
+if __name__ == "__main__":
+    client = serverMain()
+    client.RunServer()
