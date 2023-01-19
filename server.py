@@ -7,6 +7,7 @@ from cryptography.fernet import Fernet
 import base64
 import random
 import time
+import queue
 
 #Add proper disconnect handling on client side
 class serverMain():
@@ -27,6 +28,9 @@ class serverMain():
     def Broadcast(self, sentConn, command, message):
         command = str(command) + str(self._verifiedUsers.get(sentConn))+ ": "
         message = str(command) + str(message)
+        file1 = open("chatLog.txt","a+")
+        file1.write(message[1:]+"\n")
+        file1.close()
         for conn in self._verifiedUsers:
             if conn != sentConn:
                 holder = conn
@@ -74,12 +78,19 @@ class serverMain():
         else:
             self.SendData(conn, 2, "Password Incorrect.", fernet)
 
+    def RetrieveChatLog(self, conn, fernet):
+        file1 = open("chatLog.txt","r")
+        Lines = file1.readlines()
+        for line in Lines:
+            time.sleep(0.5)
+            line = line.strip()
+            print(line)
+            self.SendData(conn, 2, line, fernet)
+        file1.close()
+
     def SendData(self, conn, command, message, fernet):
-        print("1. ", message)
         message = str(command) + str(message)
-        print("2. ", message)
         message = self.EncryptMessage(message, fernet)
-        print("3. ", message)
         conn.send(message)
 
     def Main(self, conn, addr):
@@ -91,7 +102,7 @@ class serverMain():
                     try:
                         if fernet != None:
                             rData = self.DecryptMessage(rData, fernet)
-                            rData = rData.decode()  
+                            rData = rData.decode()
                     except Exception as e:
                         pass
                     command = int(rData[0])
@@ -110,29 +121,38 @@ class serverMain():
                                 self.SendData(conn, 2, message, fernet)
                         case 3:
                             self.ChangeUsername(conn, message)
+                        case 4:
+                            try:
+                                self.RetrieveChatLog(conn, fernet)
+                            except Exception as e:
+                                print(e)
+                                pass
                 except Exception as e:
-                    print(e)
-                    for x in self._Users:
+                    print(f"User disconnected: {addr}")
+                    for x in self._Users.copy():
                         if x == conn:
-                            try:
                                 del self._Users[conn]
-                            except:
                                 pass
-                            try:
+                    for x in self._unverifiedUsers.copy():
+                        if x == conn:
                                 del self._unverifiedUsers[conn]
-                            except:
-                                pass       
-                            try:
-                                del self._verifiedUsers[conn]
-                            except:
+                                conn.close()
                                 pass
-                        pass
+                    for x in self._verifiedUsers.copy():
+                        if x == conn:
+                                del self._verifiedUsers[conn]
+                                conn.close()
+                                pass
+                    return
 
             else:
-                print(f"New client registered: {addr}")
-                self._Users[conn] = "Guest"
-                self._unverifiedUsers[conn] = "Guest"
-                sent = self.HandShake(conn, 0, "")
+                try:
+                    print(f"New client registered: {addr}")
+                    self._Users[conn] = "Guest"
+                    self._unverifiedUsers[conn] = "Guest"
+                    sent = self.HandShake(conn, 0, "")
+                except:
+                    pass
 
     def RunServer(self):       
         threadCount = os.cpu_count()

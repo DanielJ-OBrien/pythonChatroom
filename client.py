@@ -4,110 +4,132 @@ import time
 from cryptography.fernet import Fernet
 import base64
 import random
+from _thread import *
+from threading import Thread
 
 class ClientMain:
-    loggedInState = False
-    fernet = None
     
-class DataProcessorClass(ClientMain):
-    publicPrime = 134715397998534382362543644062597181361609479648842843616200298096041989690697848999412391468700769363391823159719834719898132229523645517185214071033109009859909166224500832798606843889422676631533434306132458441957921028226184976216824642407273933750712043589484173533001512977046594666429936219284470523999
-    publicBase = random.randint(1, 100)
-    privateNumber = 29
+    def __init__(self):
+        
+        self._s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._loggedInState = False
+        self._fernet = None
+        self._publicPrime = 134715397998534382362543644062597181361609479648842843616200298096041989690697848999412391468700769363391823159719834719898132229523645517185214071033109009859909166224500832798606843889422676631533434306132458441957921028226184976216824642407273933750712043589484173533001512977046594666429936219284470523999
+        self._publicBase = random.randint(1, 100)
+        self._privateNumber = 29
 
-    def DataProcessor():
+    def DataProcessor(self):
         while True:
             try:
-                rData = s.recv(1024).decode('utf-8')
-                if ClientMain.fernet != None:
-                    rData = DataProcessorClass.DecryptMessage(rData, ClientMain.fernet)
-                    rData = rData.decode() 
+                rData = self._s.recv(1024).decode('utf-8')
+                if self._fernet != None:
+                    rData = self.DecryptMessage(rData, self._fernet)
+                    rData = rData.decode()
                 command = int(rData[0])
                 message = rData[1:]
                 match command:
                     case 0:
-                        sharedKey = DataProcessorClass.HandShake(message)
-                        ClientMain.fernet = Fernet(DataProcessorClass.ConvertFern(sharedKey))
+                        sharedKey = self.HandShake(message)
+                        self._fernet = Fernet(self.ConvertFern(sharedKey))
                     case 1:
-                        DataProcessorClass.CalculateSecret(message)
+                        self.CalculateSecret(message)
                     case 2:
-                        DataProcessorClass.DisplayMessage(message)
+                        self.DisplayMessage(message)
                     case 3:
-                        ClientMain.loggedInState = True
+                        self._loggedInState = True
             except Exception as e:
+                #print(f"0. {e}")
                 pass
 
-    def DecryptMessage(message, fernet):
-        decodedMessage = fernet.decrypt(message)
+    def DecryptMessage(self, message, fernet):
+        decodedMessage = self._fernet.decrypt(message)
         return decodedMessage
 
-    def HandShake(message2):
+    def HandShake(self, message2):
         try:
-            message = pow(DataProcessorClass.publicBase,DataProcessorClass.privateNumber,DataProcessorClass.publicPrime)
+            message = pow(self._publicBase,self._privateNumber,self._publicPrime)
             sent = message
             message = "0" + str(message)
-            s.send((message).encode("utf-8"))
-            key = DataProcessorClass.CalculateSecret(message2, sent)
+            self._s.send((message).encode("utf-8"))
+            key = self.CalculateSecret(message2, sent)
         except Exception as e:
-            print(e)
+            print(f"1. {e}")
         return key
 
-    def CalculateSecret(message, sent):
-        return (pow(sent,int(message),DataProcessorClass.publicPrime))
+    def CalculateSecret(self, message, sent):
+        return (pow(sent,int(message),self._publicPrime))
 
-    def ConvertFern(sharedKey):
+    def ConvertFern(self, sharedKey):
         return base64.urlsafe_b64encode(f"{sharedKey:032d}".encode("utf-8")[:32])   
 
-    
-    def DisplayMessage(message):
+    def DisplayMessage(self, message):
         print(message)
-
-
-class DataSenderClass(ClientMain):
     
-    def DataSender():
+    def DataSender(self):
         #Sends messages when logged in
         while True:
             try:
                 time.sleep(1)
                 uip = input()
                 try:
-                    if ClientMain.loggedInState == True:
-                        DataSenderClass.SendBroadcast(uip, ClientMain.fernet)
+                    if self._loggedInState == True:
+                        if uip[0] != "/":
+                            self.SendBroadcast(uip, self._fernet)
+                        elif uip[0:5] == "/nick":
+                            self.SendUsername(uip, self._fernet)
+                        elif uip[0:4] == "/log":
+                            self.SendLogRequest(uip, self._fernet)
                     else:
                         #Sends password login attempts when not logged in
                         print("Logging in...")
-                        DataSenderClass.SendPassword(uip, ClientMain.fernet)
+                        self.SendPassword(uip, self._fernet)
                 except Exception as e:
-                    print(e)
+                    print(f"2. {e}")
             except:
                 pass
 
-    def EncryptMessage(message, fernet):
-        encryptedMessage = fernet.encrypt(bytes(message, encoding='utf8'))
+    def EncryptMessage(self, message, fernet):
+        encryptedMessage = self._fernet.encrypt(bytes(message, encoding='utf8'))
         return encryptedMessage
 
-    def SendBroadcast(message, fernet):
+    def SendBroadcast(self, message, fernet):
         message = "1" + message
-        message = DataSenderClass.EncryptMessage(message, fernet)
-        s.send(message)
+        message = self.EncryptMessage(message, self._fernet)
+        self._s.send(message)
         
-    def SendPassword(message, fernet):
+    def SendPassword(self, message, fernet):
         message = "2" + message
-        message = DataSenderClass.EncryptMessage(message, fernet)
-        s.send(message)
+        message = self.EncryptMessage(message, self._fernet)
+        self._s.send(message)
+        
+    def SendUsername(self, message, fernet):
+        message = "3" + message
+        message = self.EncryptMessage(message, self._fernet)
+        self._s.send(message)
+        
+    def SendLogRequest(self, message, fernet):
+        message = "4" + message
+        message = self.EncryptMessage(message, self._fernet)
+        self._s.send(message)
 
-hostname = socket.gethostname()
-HOST = socket.gethostbyname(hostname)
-PORT = 50001
-s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-s.connect((HOST,PORT))
-s.setblocking(0) 
-threadPool = concurrent.futures.ThreadPoolExecutor(max_workers=4) 
-try:
-    threadPool.submit(DataProcessorClass.DataProcessor)
-    threadPool.submit(DataSenderClass.DataSender)
-    while True:
-        pass
-except Exception as e:
-    print("Huge error")
-    print(e)
+    def RunClient(self):
+        hostname = socket.gethostname()
+        HOST = socket.gethostbyname(hostname)
+        PORT = 50001
+        self._s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        self._s.connect((HOST,PORT))
+        self._s.setblocking(0) 
+        try:
+            thread1 = Thread(target = self.DataProcessor, args =())
+            thread2 = Thread(target = self.DataSender, args =())
+            thread1.start()
+            thread2.start()
+            while True:
+                pass
+        except Exception as e:
+            print("Huge error")
+            print(e)
+    
+if __name__ == "__main__":
+    client = ClientMain()
+    client.RunClient()
