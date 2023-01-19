@@ -17,10 +17,14 @@ class ClientMain:
         self._publicPrime = 134715397998534382362543644062597181361609479648842843616200298096041989690697848999412391468700769363391823159719834719898132229523645517185214071033109009859909166224500832798606843889422676631533434306132458441957921028226184976216824642407273933750712043589484173533001512977046594666429936219284470523999
         self._publicBase = random.randint(1, 100)
         self._privateNumber = 29
+        self._connected = False
+        self._stop = False
 
     def DataProcessor(self):
         while True:
             try:
+                if self._stop == True:
+                    return
                 rData = self._s.recv(1024).decode('utf-8')
                 if self._fernet != None:
                     rData = self.DecryptMessage(rData, self._fernet)
@@ -66,9 +70,12 @@ class ClientMain:
         print(message)
     
     def DataSender(self):
+        print("Insert password to continue.")
         #Sends messages when logged in
         while True:
             try:
+                if self._stop == True:
+                    return
                 time.sleep(1)
                 uip = input()
                 try:
@@ -84,7 +91,10 @@ class ClientMain:
                         print("Logging in...")
                         self.SendPassword(uip, self._fernet)
                 except Exception as e:
-                    print(f"2. {e}")
+                    print("Message failed due to server disconnect.")
+                    self._loggedInState = False
+                    self._connected = False
+                    return
             except:
                 pass
 
@@ -113,22 +123,40 @@ class ClientMain:
         self._s.send(message)
 
     def RunClient(self):
-        hostname = socket.gethostname()
-        HOST = socket.gethostbyname(hostname)
-        PORT = 50001
-        self._s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
-        self._s.connect((HOST,PORT))
-        self._s.setblocking(0) 
-        try:
-            thread1 = Thread(target = self.DataProcessor, args =())
-            thread2 = Thread(target = self.DataSender, args =())
-            thread1.start()
-            thread2.start()
-            while True:
+        while True:
+            try:
+                hostname = socket.gethostname()
+                HOST = socket.gethostbyname(hostname)
+                PORT = 50001
+                self._s = socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+                self._s.connect((HOST,PORT))
+                self._s.setblocking(0)
+                self._connected = True
+                self._stop = False
+                self._loggedInState = False
+                self._fernet = None
+                while True:
+                    try:
+                        thread1 = Thread(target = self.DataProcessor, args =())
+                        thread2 = Thread(target = self.DataSender, args =())
+                        thread1.start()
+                        thread2.start()
+                        while True:
+                            if self._connected == True:
+                                pass
+                            else:
+                                break
+                        self._stop = True
+                        break
+                    except Exception as e:
+                        print("4")
+                        print(f"3. {e}")
+                        self._stop = True
+                        time.sleep(5)
+            except Exception as e:
+                print("Attempting to reconnect...")
+                time.sleep(5)
                 pass
-        except Exception as e:
-            print("Huge error")
-            print(e)
     
 if __name__ == "__main__":
     client = ClientMain()
