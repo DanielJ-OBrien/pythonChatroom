@@ -1,24 +1,16 @@
 Guest: hi
+Guest: test1
+dan: test2
+Guest: 1
+Guest: 2
+Guest: 2
+Guest: 34
 Guest: test
-Guest: bye
-Guest: pog
-Guest: test
-Guest: test2
-Guest: test3
-Guest: hiii
+Guest: h
+Guest: hia
+Guest: mmmm
+Guest: not good...
+Guest: wait good
+Guest: im dumb
 Guest: hi
 Guest: cool
-Guest: hiii!!!
-Guest: :)
-Guest: hii
-Guest: yo
-Guest: sup
-Guest: cool
-Guest: cool
-Guest: swag
-Guest: no what
-Guest: very pog
-Guest: hi!!!
-Guest: ok pog
-Guest: baller
-Guest: yay :)
