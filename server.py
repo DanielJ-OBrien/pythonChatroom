@@ -154,7 +154,7 @@ class serverMain():
             file1 = open("chatLog.txt","r")
             Lines = file1.readlines()
             for line in Lines:
-                time.sleep(0.2)
+                time.sleep(0.4)
                 line = line.strip()
                 self.SendData(conn, 2, line, fernet, False)
             file1.close()

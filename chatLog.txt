@@ -1,16 +1,2 @@
 Guest: hi
-Guest: test1
-dan: test2
-Guest: 1
-Guest: 2
-Guest: 2
-Guest: 34
-Guest: test
-Guest: h
-Guest: hia
-Guest: mmmm
-Guest: not good...
-Guest: wait good
-Guest: im dumb
-Guest: hi
-Guest: cool
+dan: hi
